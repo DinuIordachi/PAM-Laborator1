@@ -1,35 +1,72 @@
-# Raport de Proiect Android – Kotlin
+# Raport
+Lucrare de laborator nr.1 *la Programarea aplicatiilor Mobile*
 
-## Titlul proiectului: Task Manager UI
+**A efectuat:**	st. gr. TI-211 F/r Iordachi Dumitru
 
-**Tehnologii utilizate:**  
-- Kotlin  
-- Android SDK  
-- ViewModel + LiveData  
-- RecyclerView  
-- ViewBinding  
-- Sistem de notificări  
-- Material Design
+**A verificat:** prof. univ. Antohi Ionel
+
+
+# Tema: UI View Model
+
+## Obiective 
+Dezvoltarea unei aplicații pe una din platformele stabilite la Laboratorul Nr.0 , utilizând mediul de dezvoltare corespunzător acesteia. 
+
+## Scopul 
+De prezentat o aplicație ce rulează pe un dispozitiv sau emulator, ce va conține pe interfața sa, următoarele elemente: 
+1.  4 butoane (ce vor executa condițiile de mai jos) 
+2.	1 TextBox (pentru input) 
+3.	1 custom Object List (pentru afisarea unei liste de elemente conform cerintei de mai jos)
+ 
+## Condiții 
+
+De utilizat componentele UI pentru a realiza următoarele condiții: 
+1.	De creat un push notification pe ecranul dispozitivului care se va trata peste 10s. 
+2.	De utilizat browserul intern al dispozitivului, pentru a inițializa o căutare în Google, conform cuvântului cheie introdus în TextBox. 
+3.	Pentru elementul de tip List Option/Entity View se va alege o tema la dorinta propie. Conditiile pe care trebuie sa le intruneasca elemnetele afisate in cadrul aplicatie sunt urmatoarele:
+    - Head Title (se va defini numele general al obiectului)
+    -	Content Option (continutul mai desfasurat al elementului afisat)  
 
 ---
 
-## 1. Descriere generală
+# Mersul Lucrării
 
-Acest proiect reprezintă o aplicație Android scrisă în limbajul Kotlin, care simulează un mini sistem de gestionare a sarcinilor (**Task Manager**). Utilizatorul poate introduce un cuvânt cheie, efectua o căutare Google, adăuga o sarcină, șterge lista de sarcini și programa o notificare ce apare peste 10 secunde.
+## 1. Notificarea
 
----
+```kotlin
+object NotificationUtil {
+    private const val CHANNEL_ID = "task_channel"
 
-## 2. Obiective implementate
+    fun showNotification(context: Context) {
 
-- ✅ Interfață UI compusă din:
-  - 4 butoane (`Search`, `Add`, `Clear`, `Notify`)
-  - 1 câmp de text (`EditText`)
-  - 1 listă personalizată (`RecyclerView`) pentru afișarea obiectelor `Task`
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-- ✅ Căutare Google în browser folosind `Intent.ACTION_VIEW`
-- ✅ Adăugare și ștergere sarcini cu ajutorul unui `ViewModel`
-- ✅ Notificare programată după 10 secunde, cu verificare a permisiunii
-- ✅ Cerere dinamică a permisiunii `POST_NOTIFICATIONS` pentru Android 13+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(CHANNEL_ID, "Task Channel", NotificationManager.IMPORTANCE_HIGH)
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setContentTitle("Notificare Programată")
+            .setContentText("Aceasta este o notificare după 10 secunde")
+            .setSmallIcon(R.drawable.ic_bell)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+
+        notificationManager.notify(12345, builder.build())
+    }
+}
+
+```
 
 ---
 
