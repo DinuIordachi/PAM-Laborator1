@@ -65,53 +65,187 @@ object NotificationUtil {
         notificationManager.notify(12345, builder.build())
     }
 }
-
 ```
 
+## 2. Căutarea Google în browser
+
+```kotlin
+btnSearch.setOnClickListener {
+    val query = searchInput.text.toString()
+    if (query.isNotEmpty()) {
+        val url = "https://www.google.com/search?q=${Uri.encode(query)}"
+        startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
+    }
+}
+```
+
+## 3. Lista de elemente
+
+### 3.1. XML Layout
+Am definit o temă proprie care constă dintr-un Linear Layout vertical. Lyout-ul conține 2 TextView pentru textul si descrierea task-ului respectiv. Fiecare Task va fi inculs în lista `RecyclerView` declarată în `activiy_main.xml`
+```xml
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:padding="8dp"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <TextView
+        android:id="@+id/taskTitle"
+        android:textStyle="bold"
+        android:textSize="18sp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
+
+    <TextView
+        android:id="@+id/taskDescription"
+        android:textSize="14sp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
+</LinearLayout>
+```
+
+```xml
+<androidx.recyclerview.widget.RecyclerView
+    android:id="@+id/recyclerView"
+    android:layout_width="match_parent"
+    android:layout_height="0dp"
+    android:layout_weight="1" />
+```
+
+### 3.2. TaskViewModel
+Am utilizat `TaskViewModel` pentru a gestiona logic datele într-un mod separat față de interfața grafică. Acesta păstrează și expune o listă de sarcini (`LiveData<List<Task>>`) care poate fi observată din activitate, astfel încât UI-ul să se actualizeze automat la modificări, fără a pierde datele în cazul rotației ecranului.
+
+```kotlin
+class TaskViewModel : ViewModel() {
+    private val _tasks = MutableLiveData<List<Task>>(emptyList())
+    val tasks: LiveData<List<Task>> = _tasks
+
+    fun addTask(task: Task) {
+        _tasks.value = _tasks.value?.plus(task)
+    }
+
+    fun clearTasks() {
+        _tasks.value = emptyList()
+    }
+}
+```
+
+### 3.3. TaskAdapter
+Am utilizat `TaskAdapter` pentru a afișa lista de obiecte `Task` într-un `RecyclerView` într-un mod eficient și optimizat. Acest adapter extinde `ListAdapter`, care folosește `DiffUtil` pentru a actualiza doar elementele care s-au modificat, oferind performanță mai bună și o experiență fluentă în interfața grafică.
+
+```kotlin
+class TaskAdapter : ListAdapter<Task, TaskAdapter.TaskViewHolder>(DiffCallback()) {
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): TaskViewHolder {
+        val view = LayoutInflater.from(parent.context).inflate(R.layout.item_task, parent, false)
+        return TaskViewHolder(view)
+    }
+
+    override fun onBindViewHolder(holder: TaskViewHolder, position: Int) {
+        val task = getItem(position)
+        holder.bind(task)
+    }
+
+    class TaskViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private val title = itemView.findViewById<TextView>(R.id.taskTitle)
+        private val description = itemView.findViewById<TextView>(R.id.taskDescription)
+
+        fun bind(task: Task) {
+            title.text = task.title
+            description.text = task.description
+        }
+    }
+
+    class DiffCallback : DiffUtil.ItemCallback<Task>() {
+        override fun areItemsTheSame(oldItem: Task, newItem: Task) = oldItem.title == newItem.title
+        override fun areContentsTheSame(oldItem: Task, newItem: Task) = oldItem == newItem
+    }
+}
+```
+
+### 3.4. Adăugare și ștergere
+
+```kotlin
+btnAdd.setOnClickListener {
+    val query = searchInput.text.toString()
+    viewModel.addTask(Task(title = query, description = "Descriere pentru $query"))
+}
+
+btnClear.setOnClickListener {
+    viewModel.clearTasks()
+}
+```
 ---
 
-## 3. Funcționalități detaliate
+## 4. Funcționalități adiționale
+Pentru a asigura funcționarea corectă a notificărilor am adăugat solicitarea permisiunilor de notificare direct din aplicație ținând cont de versiunile Android API.
 
-### a. Căutare Google
-Utilizatorul poate introduce un cuvânt în câmpul `EditText`, iar prin apăsarea butonului `Search`, aplicația lansează un browser care deschide căutarea Google cu acel cuvânt.
+```kotlin
+private val notificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+            hasNotificationPermissionGranted = isGranted
+            if (!isGranted) {
+                // If permission not granted and it's Android API >= 33, show rationale materialUI
+                if (Build.VERSION.SDK_INT >= 33) {
+                    if (shouldShowRequestPermissionRationale(android.Manifest.permission.POST_NOTIFICATIONS)) {
+                        showNotificationPermissionRationale()
+                    } else {
+                        // if Android API < 33 show classic dialog that redirects to settings
+                        showSettingDialog()
+                    }
+                }
+            } else {
+                Toast
+                    .makeText(this, "notification permission granted", Toast.LENGTH_SHORT)
+                    .show()
+            }
+        }
 
-### b. Adăugare sarcini
-Prin butonul `Add`, se adaugă în listă un obiect `Task` cu titlu și descriere generate pe baza textului introdus.
+    private fun showSettingDialog() {
+        MaterialAlertDialogBuilder(this, com.google.android.material.R.style.MaterialAlertDialog_Material3)
+            .setTitle("Notification Permission")
+            .setMessage("Notification permission is required, Please allow notification permission from setting")
+            .setPositiveButton("Ok") { _, _ ->
+                val intent = Intent(ACTION_APPLICATION_DETAILS_SETTINGS)
+                intent.data = "package:$packageName".toUri()
+                startActivity(intent)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
 
-### c. Ștergere sarcini
-Butonul `Clear` golește întreaga listă observabilă din `ViewModel`.
+    private fun showNotificationPermissionRationale() {
+        MaterialAlertDialogBuilder(this, com.google.android.material.R.style.MaterialAlertDialog_Material3)
+            .setTitle("Alert")
+            .setMessage("Notification permission is required, to show notification")
+            .setPositiveButton("Ok") { _, _ ->
+                launchNotificationPermissions()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
 
-### d. Notificări
-Aplicația lansează o notificare după 10 secunde de la apăsarea butonului `Notify`. Dacă permisiunea nu este acordată, aplicația solicită permisiunea în mod prietenos, cu explicații (`rationale`) și trimitere în setări dacă este necesar.
+    private fun launchNotificationPermissions() {
+        if (Build.VERSION.SDK_INT >= 33) {
+            if (ActivityCompat.checkSelfPermission(this, "android.permission.POST_NOTIFICATIONS")
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+                // Trigger permission request from caller
+                notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
 
+                return
+            }
+        } else {
+            hasNotificationPermissionGranted = true
+        }
+    }
+```
 ---
 
-## 4. Structura aplicației
-
-- `MainActivity.kt`: gestionează interfața și evenimentele UI
-- `Task.kt`: model de date simplu cu `title` și `description`
-- `TaskViewModel.kt`: folosește `LiveData` pentru lista de sarcini
-- `TaskAdapter.kt`: adaptează lista de sarcini în `RecyclerView`
-- `NotificationUtil.kt`: conține logica pentru afișarea notificării
-
----
-
-## 5. Probleme întâmpinate
-
-- Necesitatea gestionării corecte a permisiunilor de notificare pentru Android 13+
-- Utilizarea `applicationContext` în loc de `Activity context` ducea la erori de tip `uid -1`
-- Adaptarea cererii de permisiune la standardele Android moderne (`ActivityResultLauncher`)
-
----
-
-## 6. Concluzii
-
-Proiectul a atins toate obiectivele propuse și demonstrează integrarea mai multor componente importante din ecosistemul Android:
-
-- Arhitectură MVVM (Model-View-ViewModel)
-- Componente reactive (`LiveData`)
-- Gestionarea permisiunilor la runtime
-- Utilizarea notificărilor și `MaterialAlertDialog`
+## Concluzie
+Lucrarea de față a demonstrat realizarea unei aplicații Android utilizând limbajul Kotlin și principiile moderne ale arhitecturii MVVM (Model-View-ViewModel). Aplicația „Task Manager UI” îmbină funcționalități esențiale din dezvoltarea Android, precum manipularea interfeței grafice prin ViewBinding, afișarea de liste dinamice cu ajutorul RecyclerView și actualizarea automată a datelor prin LiveData. În plus, s-a implementat un sistem complet de notificări, inclusiv gestionarea permisiunilor POST_NOTIFICATIONS în conformitate cu cerințele Android 13+.
+Proiectul a urmărit nu doar realizarea funcționalităților de bază (adăugare, ștergere, notificări), ci și o abordare corectă și scalabilă din punct de vedere al codului sursă. Utilizarea ViewModel-ului a permis separarea clară dintre logică și interfață, făcând aplicația mai ușor de întreținut. De asemenea, integrarea permisiunilor runtime și afișarea de mesaje explicative (rationale dialogs) a adus aplicația la un nivel profesional, respectând bunele practici Android.
+În concluzie, acest proiect oferă o bază solidă pentru aplicații mai complexe, demonstrând că principii simple și clare pot duce la rezultate eficiente și bine structurate.
 
 ---
 
