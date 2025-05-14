@@ -80,6 +80,8 @@ Proiectul a atins toate obiectivele propuse și demonstrează integrarea mai mul
 
 ## 7. Vizualizare
 
+![](./pam-laborator1.GIF)
+
 ---
 
 ## 8. Bibliografie
